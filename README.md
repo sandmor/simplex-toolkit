@@ -1,5 +1,7 @@
 # Simplex Toolbox 🚀
 
+[Live Demo](https://sandmor.github.io/simplex-toolbox/)
+
 A modern, interactive step-by-step Simplex method editor and solver. Visualize each pivot operation, edit your tableau on the fly, and learn the Simplex algorithm hands-on. Perfect for students, educators, and professionals diving into linear programming.
 
 ## 🎯 Features
@@ -23,7 +25,7 @@ A modern, interactive step-by-step Simplex method editor and solver. Visualize e
 
 ```bash
 # Clone the repo
-git clone https://github.com/sandmor/simplex-toolbox.git
+git clone https://github.com/yourusername/simplex-toolbox.git
 cd simplex-toolbox
 
 # Install dependencies
@@ -66,7 +68,7 @@ npm run preview  # preview production build
 ## 📚 Learn More
 
 - Dive into the code in `src/simplex-logic` to understand parsing, tableau operations, and the Big M implementation.
-- UI components are built with [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), Tailwind CSS, and [ShadCN UI](https://ui.shadcn.com).
+- UI components are built with [React](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), and [Tailwind CSS](https://tailwindcss.com/).
 
 ## 📜 License
 
