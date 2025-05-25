@@ -4,6 +4,7 @@ import Controls from "./components/controls.tsx";
 import Explanation from "./components/explanation.tsx";
 import Solution from "./components/solution.tsx";
 import ProblemDefinition from "./components/problem-definition.tsx";
+import TransportationApp from "./TransportationApp.tsx";
 import { cloneDeep } from "lodash";
 import {
   SimplexState,
@@ -19,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "./components/ui/card.tsx";
+import { Button } from "./components/ui/button.tsx";
 
 // Default problem used as fallback
 const defaultProblem = {
@@ -69,6 +71,9 @@ function buildDualProblem(primal: {
 }
 
 function App() {
+  const [currentMode, setCurrentMode] = useState<"simplex" | "transportation">(
+    "simplex"
+  );
   const [history, setHistory] = useState<SimplexState[]>([]);
   const [currentStep, setCurrentStep] = useState<number>(0);
   // New editing states
@@ -94,7 +99,7 @@ function App() {
     const initialState = initializeProblem(
       problemDef.objective,
       problemDef.constraints,
-      problemDef.isMaximization,
+      problemDef.isMaximization
     );
     setHistory([initialState]);
     setCurrentStep(0);
@@ -166,7 +171,7 @@ function App() {
 
     if (safetyBreak >= 100) {
       setFinalInterpretation(
-        "Solver stopped after 100 iterations. Check for cycling or errors.",
+        "Solver stopped after 100 iterations. Check for cycling or errors."
       );
       setIsSolved(true); // Treat as solved/stopped
     }
@@ -196,69 +201,108 @@ function App() {
 
   return (
     <div className="App max-w-5xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">
-        Simplex Solver (Step-by-Step)
-      </h1>
+      {/* Mode Selection Header */}
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-bold mb-4 text-center">
+          Linear Programming Toolbox
+        </h1>
+        <p className="text-lg text-muted-foreground mb-6">
+          Choose your problem type and solve step-by-step
+        </p>
 
-      <ProblemDefinition onProblemSubmit={handleProblemSubmit} />
-
-      {!problemSubmitted ? (
-        <div className="flex items-center justify-center p-8 border rounded-md">
-          <p className="text-muted-foreground">
-            Define and submit a problem above to get started
-          </p>
+        {/* Mode Toggle */}
+        <div className="flex justify-center gap-2 mb-6">
+          <Button
+            variant={currentMode === "simplex" ? "default" : "outline"}
+            onClick={() => setCurrentMode("simplex")}
+            className="px-6 py-3"
+          >
+            📊 Simplex Method
+          </Button>
+          <Button
+            variant={currentMode === "transportation" ? "default" : "outline"}
+            onClick={() => setCurrentMode("transportation")}
+            className="px-6 py-3"
+          >
+            🚚 Transportation Problem
+          </Button>
         </div>
-      ) : displayState ? (
-        <>
-          {showFormulation && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle>Problem Formulation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <pre
-                  className="whitespace-pre-wrap font-mono text-sm"
-                  dangerouslySetInnerHTML={{ __html: displayState.formulation }}
-                />
-              </CardContent>
-            </Card>
-          )}
-          <div className="bg-card rounded-lg border shadow-sm p-4">
-            <h2 className="text-2xl font-semibold mb-4">
-              Tableau - Step {currentStep + 1}
-            </h2>
+      </div>
 
-            <Tableau
-              state={displayState}
-              showDual={showDual}
-              editing={isEditing}
-              onStateChange={setEditedState!}
-            />
-
-            <Explanation state={displayState} />
-
-            <Controls
-              onNext={handleNextStep}
-              onPrev={handlePrevStep}
-              onSolveAll={handleSolveAll}
-              canPrev={currentStep > 0}
-              canNext={!isSolved && !isEditing}
-              canSolveAll={!isSolved && !isEditing}
-              showFormulation={showFormulation}
-              onToggleFormulation={() => setShowFormulation(!showFormulation)}
-              showDual={showDual}
-              onToggleDual={() => setShowDual(!showDual)}
-              showEditMode={isEditing}
-              onToggleEdit={handleToggleEdit}
-            />
-          </div>
-
-          {isSolved && <Solution interpretation={finalInterpretation} />}
-        </>
+      {/* Conditional Rendering based on mode */}
+      {currentMode === "transportation" ? (
+        <TransportationApp />
       ) : (
-        <div className="flex items-center justify-center h-32 border rounded-md">
-          <p className="text-muted-foreground">Initializing solver...</p>
-        </div>
+        <>
+          <h2 className="text-2xl font-bold mb-6 text-center">
+            Simplex Solver (Step-by-Step)
+          </h2>
+
+          <ProblemDefinition onProblemSubmit={handleProblemSubmit} />
+
+          {!problemSubmitted ? (
+            <div className="flex items-center justify-center p-8 border rounded-md">
+              <p className="text-muted-foreground">
+                Define and submit a problem above to get started
+              </p>
+            </div>
+          ) : displayState ? (
+            <>
+              {showFormulation && (
+                <Card className="mb-4">
+                  <CardHeader>
+                    <CardTitle>Problem Formulation</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <pre
+                      className="whitespace-pre-wrap font-mono text-sm"
+                      dangerouslySetInnerHTML={{
+                        __html: displayState.formulation,
+                      }}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+              <div className="bg-card rounded-lg border shadow-sm p-4">
+                <h2 className="text-2xl font-semibold mb-4">
+                  Tableau - Step {currentStep + 1}
+                </h2>
+
+                <Tableau
+                  state={displayState}
+                  showDual={showDual}
+                  editing={isEditing}
+                  onStateChange={setEditedState!}
+                />
+
+                <Explanation state={displayState} />
+
+                <Controls
+                  onNext={handleNextStep}
+                  onPrev={handlePrevStep}
+                  onSolveAll={handleSolveAll}
+                  canPrev={currentStep > 0}
+                  canNext={!isSolved && !isEditing}
+                  canSolveAll={!isSolved && !isEditing}
+                  showFormulation={showFormulation}
+                  onToggleFormulation={() =>
+                    setShowFormulation(!showFormulation)
+                  }
+                  showDual={showDual}
+                  onToggleDual={() => setShowDual(!showDual)}
+                  showEditMode={isEditing}
+                  onToggleEdit={handleToggleEdit}
+                />
+              </div>
+
+              {isSolved && <Solution interpretation={finalInterpretation} />}
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-32 border rounded-md">
+              <p className="text-muted-foreground">Initializing solver...</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
