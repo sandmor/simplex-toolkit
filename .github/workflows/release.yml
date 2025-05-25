@@ -1,0 +1,134 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., v1.0.0)"
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: "18"
+  PNPM_VERSION: "8"
+
+jobs:
+  build-and-release:
+    name: Build and Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run full build
+        run: pnpm run build
+
+      - name: Run linting
+        run: npx eslint . --ext .ts,.tsx
+
+      - name: Create build archive
+        run: |
+          cd dist
+          tar -czf ../simplex-toolbox-build.tar.gz .
+          cd ..
+
+      - name: Get version from tag or input
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Generating release notes for $VERSION"
+
+          cat > release_notes.md << EOF
+          # 🚀 Simplex Toolbox $VERSION
+
+          ## ✨ Features
+          - **Linear Programming Solver**: Complete simplex method implementation with step-by-step visualization
+          - **Transportation Problem Solver**: Multiple algorithms (Northwest Corner, Least Cost, VAM, MODI)
+          - **Assignment Problem Solver**: Hungarian algorithm implementation
+          - **Generic Architecture**: Modular design with reusable generic components
+
+          ## 🔧 Technical Improvements
+          - Type-safe TypeScript implementation
+          - Modern React 19 with Vite build system
+          - Responsive UI with Tailwind CSS
+          - Comprehensive error handling and validation
+
+          ## 📦 Downloads
+          - **Web Application**: Ready to deploy static build
+          - **Source Code**: Complete TypeScript/React implementation
+
+          ## 🛠️ Requirements
+          - Modern web browser with JavaScript enabled
+          - Node.js 18+ for development
+
+          ## 📚 Documentation
+          See the [README.md](https://github.com/${{ github.repository }}/blob/main/README.md) for setup and usage instructions.
+          EOF
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Simplex Toolbox ${{ steps.version.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+
+      - name: Upload build artifact to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./simplex-toolbox-build.tar.gz
+          asset_name: simplex-toolbox-${{ steps.version.outputs.version }}-build.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Deploy to GitHub Pages (if enabled)
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          cname: # Add your custom domain here if you have one

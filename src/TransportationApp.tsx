@@ -1,9 +1,13 @@
+// Transportation Problem Solver using generic components
 import { useState } from "react";
+import GenericProblemSolverApp, {
+  ProblemSolverConfig,
+} from "./common/generic-problem-solver-app";
 import TransportationProblemDefinition from "./components/transportation-problem-definition";
 import TransportationTableau from "./components/transportation-tableau";
 import TransportationExplanation from "./components/transportation-explanation";
-import TransportationControls from "./components/transportation-controls";
 import TransportationSolution from "./components/transportation-solution";
+import { Button } from "./components/ui/button";
 import {
   TransportationProblem,
   TransportationState,
@@ -15,136 +19,115 @@ import {
 import { initializeMODI } from "./transportation-logic/modi";
 
 export default function TransportationApp() {
-  const [currentProblem, setCurrentProblem] =
-    useState<TransportationProblem | null>(null);
-  const [history, setHistory] = useState<TransportationState[]>([]);
-  const [currentStep, setCurrentStep] = useState<number>(0);
-  const [problemSubmitted, setProblemSubmitted] = useState<boolean>(false);
   const [selectedMethod, setSelectedMethod] = useState<InitialMethod>("VAM");
-
-  const handleProblemSubmit = (problem: TransportationProblem) => {
-    setCurrentProblem(problem);
-    const initialState = initializeTransportationProblem(
-      problem,
-      selectedMethod
-    );
-    setHistory([initialState]);
-    setCurrentStep(0);
-    setProblemSubmitted(true);
-  };
 
   const handleMethodChange = (method: InitialMethod) => {
     setSelectedMethod(method);
-    if (currentProblem) {
-      // Restart with new method
-      const initialState = initializeTransportationProblem(
-        currentProblem,
-        method
-      );
-      setHistory([initialState]);
-      setCurrentStep(0);
-    }
+    // The problem will be re-initialized with the new method when submitted
   };
 
-  const handleNextStep = () => {
-    const currentState = history[currentStep];
-    if (currentState.status === "Complete") return;
-
-    const nextState = performTransportationStep(currentState);
-    setHistory([...history.slice(0, currentStep + 1), nextState]);
-    setCurrentStep(currentStep + 1);
+  const handleOptimizeWithMODI = (currentState: TransportationState) => {
+    if (!currentState || currentState.status !== "Complete") return null;
+    return initializeMODI(currentState);
   };
 
-  const handlePrevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
+  // Solver configuration
+  const solverConfig: ProblemSolverConfig<
+    TransportationProblem,
+    TransportationState
+  > = {
+    title: "Transportation Problem Solver",
+    subtitle:
+      "Solve transportation problems step-by-step using three classic methods: Northwest Corner, Least Cost, and Vogel's Approximation Method. Then optimize solutions further using the MODI algorithm.",
+    icon: "🚚",
+    emptyStateMessage:
+      "Define and submit a transportation problem above to get started",
+    emptyStateIcon: "📊",
 
-  const handleSolveAll = () => {
-    const currentState = history[currentStep];
-    if (currentState.status === "Complete") return;
+    // Solver functions
+    initializeProblem: (problem: TransportationProblem) => {
+      return initializeTransportationProblem(problem, selectedMethod);
+    },
 
-    const allSteps = solveTransportationProblem(currentState);
-    // Replace from current step onwards
-    const newHistory = [...history.slice(0, currentStep), ...allSteps];
-    setHistory(newHistory);
-    setCurrentStep(newHistory.length - 1);
-  };
+    performStep: (state: TransportationState) => {
+      return performTransportationStep(state);
+    },
 
-  const handleOptimizeWithMODI = () => {
-    const currentState = history[currentStep];
-    if (!currentState || currentState.status !== "Complete") return;
+    solveCompletely: (state: TransportationState) => {
+      return solveTransportationProblem(state);
+    },
 
-    // Initialize MODI properly using the existing function
-    const modiState = initializeMODI(currentState);
+    isComplete: (state: TransportationState) => {
+      return state.status === "Complete";
+    },
 
-    // Add the MODI state to history and switch to it
-    const newHistory = [...history, modiState];
-    setHistory(newHistory);
-    setCurrentStep(newHistory.length - 1);
-  };
+    // Component factories
+    createProblemDefinition: ({ onProblemSubmit }) => (
+      <TransportationProblemDefinition onProblemSubmit={onProblemSubmit} />
+    ),
 
-  const currentState = history[currentStep];
-  const canNext = currentState && currentState.status !== "Complete";
-  const canPrev = currentStep > 0;
-  const canSolveAll = currentState && currentState.status !== "Complete";
-  const canOptimizeWithMODI =
-    currentState &&
-    currentState.status === "Complete" &&
-    currentState.method !== "MODI" &&
-    currentState.allocations.length > 0;
+    createTableau: ({ state }) => <TransportationTableau state={state} />,
 
-  return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-3">
-          🚚 Transportation Problem Solver
-        </h1>
-        <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          Solve transportation problems step-by-step using three classic
-          methods: Northwest Corner, Least Cost, and Vogel's Approximation
-          Method. Then optimize solutions further using the MODI algorithm.
-        </p>
-      </div>
+    createExplanation: ({ state }) => (
+      <TransportationExplanation state={state} />
+    ),
 
-      <TransportationProblemDefinition onProblemSubmit={handleProblemSubmit} />
+    createSolution: ({ state }) => <TransportationSolution state={state} />,
 
-      {!problemSubmitted ? (
-        <div className="flex items-center justify-center p-12 border-2 border-dashed border-gray-300 rounded-lg">
-          <div className="text-center">
-            <div className="text-4xl mb-3">📊</div>
-            <p className="text-gray-500 text-lg">
-              Define and submit a transportation problem above to get started
-            </p>
+    createCustomControls: ({ state, onCustomAction }) => {
+      const canOptimizeWithMODI =
+        state &&
+        state.status === "Complete" &&
+        state.method !== "MODI" &&
+        state.allocations.length > 0;
+
+      return (
+        <div className="flex gap-2 mt-4">
+          <div className="flex gap-1">
+            <Button
+              variant={selectedMethod === "NWC" ? "default" : "outline"}
+              onClick={() => handleMethodChange("NWC")}
+              size="sm"
+            >
+              Northwest Corner
+            </Button>
+            <Button
+              variant={selectedMethod === "LCM" ? "default" : "outline"}
+              onClick={() => handleMethodChange("LCM")}
+              size="sm"
+            >
+              Least Cost
+            </Button>
+            <Button
+              variant={selectedMethod === "VAM" ? "default" : "outline"}
+              onClick={() => handleMethodChange("VAM")}
+              size="sm"
+            >
+              VAM
+            </Button>
+          </div>
+
+          {canOptimizeWithMODI && onCustomAction && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const modiState = handleOptimizeWithMODI(state);
+                if (modiState) {
+                  onCustomAction("addState", modiState);
+                }
+              }}
+            >
+              Optimize with MODI
+            </Button>
+          )}
+
+          <div className="ml-auto text-sm text-muted-foreground">
+            Current method: {state.method}
           </div>
         </div>
-      ) : currentState ? (
-        <div className="space-y-6">
-          <TransportationTableau state={currentState} />
-          <TransportationExplanation state={currentState} />
-          <TransportationControls
-            onNext={handleNextStep}
-            onPrev={handlePrevStep}
-            onSolveAll={handleSolveAll}
-            onMethodChange={handleMethodChange}
-            onOptimizeWithMODI={handleOptimizeWithMODI}
-            canNext={canNext}
-            canPrev={canPrev}
-            canSolveAll={canSolveAll}
-            canOptimizeWithMODI={canOptimizeWithMODI}
-            currentMethod={selectedMethod}
-            currentSolutionMethod={currentState.method}
-          />
-          <TransportationSolution state={currentState} />
-        </div>
-      ) : (
-        <div className="flex items-center justify-center h-32 border rounded-md">
-          <p className="text-muted-foreground">
-            Initializing transportation solver...
-          </p>
-        </div>
-      )}
-    </div>
-  );
+      );
+    },
+  };
+
+  return <GenericProblemSolverApp config={solverConfig} />;
 }

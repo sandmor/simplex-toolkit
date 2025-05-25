@@ -1,0 +1,132 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: "18"
+  PNPM_VERSION: "8"
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript strict check
+        run: pnpm run typecheck
+
+      - name: ESLint with error reporting
+        run: pnpm run lint
+
+      - name: Check for unused dependencies
+        run: |
+          echo "Checking for unused dependencies..."
+          npx depcheck --ignores="@types/*,eslint-*,vite,gh-pages,globals,tw-animate-css"
+
+      - name: Bundle size analysis
+        run: |
+          pnpm run build
+          echo "📦 Build artifacts:"
+          ls -lah dist/
+          echo "📊 Bundle sizes:"
+          du -sh dist/*
+
+      - name: Validate project structure
+        run: |
+          echo "🗂️ Validating project structure..."
+
+          # Check for critical files
+          required_files=(
+            "src/App.tsx"
+            "src/main.tsx"
+            "src/SimplexApp.tsx"
+            "src/TransportationApp.tsx"
+            "src/AssignmentApp.tsx"
+            "src/common/generic-problem-solver-app.tsx"
+            "src/common/generic-step-controls.tsx"
+            "src/common/generic-problem-definition.tsx"
+            "src/common/generic-tableau.tsx"
+          )
+
+          missing_files=()
+          for file in "${required_files[@]}"; do
+            if [[ ! -f "$file" ]]; then
+              missing_files+=("$file")
+            fi
+          done
+
+          if [[ ${#missing_files[@]} -gt 0 ]]; then
+            echo "❌ Missing critical files:"
+            printf '%s\n' "${missing_files[@]}"
+            exit 1
+          else
+            echo "✅ All critical files present"
+          fi
+
+          # Check for obsolete files that should be removed
+          obsolete_patterns=(
+            "src/*App.tsx"
+            "src/common/use-step-based-solver.ts"
+            "src/common/solver-interfaces.ts"
+            "debug-*.js"
+            "test-*.js"
+          )
+
+          obsolete_found=()
+          for pattern in "${obsolete_patterns[@]}"; do
+            if ls $pattern 2>/dev/null; then
+              obsolete_found+=("$pattern")
+            fi
+          done
+
+          if [[ ${#obsolete_found[@]} -gt 0 ]]; then
+            echo "⚠️ Found potentially obsolete files:"
+            printf '%s\n' "${obsolete_found[@]}"
+            echo "Consider reviewing these files for removal"
+          fi
+
+      - name: Performance check
+        run: |
+          echo "⚡ Performance validation..."
+
+          # Check bundle size limits
+          MAX_JS_SIZE=500000  # 500KB limit for JS
+          MAX_CSS_SIZE=50000  # 50KB limit for CSS
+
+          js_size=$(find dist -name "*.js" -exec cat {} \; | wc -c)
+          css_size=$(find dist -name "*.css" -exec cat {} \; | wc -c)
+
+          echo "JavaScript bundle size: ${js_size} bytes"
+          echo "CSS bundle size: ${css_size} bytes"
+
+          if [[ $js_size -gt $MAX_JS_SIZE ]]; then
+            echo "❌ JavaScript bundle too large (${js_size} > ${MAX_JS_SIZE})"
+            exit 1
+          fi
+
+          if [[ $css_size -gt $MAX_CSS_SIZE ]]; then
+            echo "❌ CSS bundle too large (${css_size} > ${MAX_CSS_SIZE})"
+            exit 1
+          fi
+
+          echo "✅ Bundle sizes within limits"

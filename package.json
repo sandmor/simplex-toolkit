@@ -9,9 +9,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "clean": "rm -rf dist node_modules/.vite",
+    "ci": "npm run typecheck && npm run lint && npm run build",
+    "format": "prettier --write 'src/**/*.{ts,tsx,css,md}'"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",
